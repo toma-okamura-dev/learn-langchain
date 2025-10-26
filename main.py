@@ -6,7 +6,7 @@ import pprint
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_community.retrievers import TavilySearchAPIRetriever
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough, RunnableParallel
 from langchain_core.output_parsers import StrOutputParser
 
 # PromptTemplateの作成
@@ -28,10 +28,14 @@ retriever = TavilySearchAPIRetriever(k=3)
 
 # RAGチェーンを構築
 chain = (
-    {"context": retriever, "question": RunnablePassthrough()}
-    | prompt
-    | model
-    | StrOutputParser()
+    RunnableParallel(
+        {
+            "question": RunnablePassthrough(),
+            "context": retriever,
+        }
+    )
+    .assign(answer=prompt | model | StrOutputParser())
+    .pick(["answer"])
 )
 
 output = chain.invoke("今日と明日の五反田の天気について教えてください")
