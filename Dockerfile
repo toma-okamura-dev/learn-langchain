@@ -10,7 +10,8 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 # uv.lock に固定されたバージョンで依存を system にインストール
-RUN uv sync --frozen --no-dev --system --no-install-project
+RUN uv sync --frozen --no-dev
+
 
 # アプリ本体をコピー（秘密情報はイメージに含めない）
 COPY main.py .
