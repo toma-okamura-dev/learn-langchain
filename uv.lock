@@ -835,10 +835,12 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "gitpython", specifier = ">=3.1.45" },
+    { name = "langchain" },
     { name = "langchain", specifier = ">=0.3.27" },
     { name = "langchain-community", specifier = ">=0.3.31" },
     { name = "langchain-openai", specifier = ">=0.3.35" },
     { name = "langchain-text-splitters", specifier = ">=0.3.11" },
+    { name = "python-dotenv" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
 ]
 

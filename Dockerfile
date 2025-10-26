@@ -1,20 +1,21 @@
-# uv + Python 同梱の軽量ベースイメージ（高速・再現性◎）
+# syntax=docker/dockerfile:1
 FROM ghcr.io/astral-sh/uv:python3.11-bookworm
 
-ENV UV_SYSTEM_PYTHON=1 \
-    PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_LINK_MODE=copy
 
 WORKDIR /app
 
-# 依存関係レイヤをキャッシュさせるために先に定義ファイルだけコピー
+# 依存定義をコピーして先にインストール
 COPY pyproject.toml uv.lock ./
-
-# uv.lock に固定されたバージョンで依存を system にインストール
 RUN uv sync --frozen --no-dev
 
+# 仮想環境をPATHに通す
+ENV VIRTUAL_ENV=/app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
-# アプリ本体をコピー（秘密情報はイメージに含めない）
+# アプリ本体をコピー
 COPY main.py .
 
-# 実行コマンド
 CMD ["python", "main.py"]
