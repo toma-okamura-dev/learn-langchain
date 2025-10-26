@@ -26,7 +26,16 @@ def build_rag_chain(db):
     retriever = db.as_retriever(search_kwargs={"k": 3})
     model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
-    prompt = ChatPromptTemplate.from_template(
+    # --- Hypothetical Document Embedding（HyDE）部分 ---
+    hypothetical_prompt = ChatPromptTemplate.from_template(
+        """次の質問に対して、仮の回答文（内容を推測した回答）を一文で書いてください。
+質問: {question}
+"""
+    )
+    hypothetical_chain = hypothetical_prompt | model | StrOutputParser()
+
+    # --- 最終的なRAGプロンプト ---
+    rag_prompt = ChatPromptTemplate.from_template(
         """以下の文脈に基づいて質問に答えてください。
 
 文脈:
@@ -36,13 +45,20 @@ def build_rag_chain(db):
 """
     )
 
+    # --- HyDEを retriever の入力前に組み合わせる ---
     chain = (
-        {"context": retriever, "question": RunnablePassthrough()}
-        | prompt
+        {
+            # ① 質問をHyDEに渡し仮想回答を生成 → retrieverにその仮想回答を渡す
+            "context": hypothetical_chain | retriever,
+            # ② 元の質問はそのまま最終プロンプトへ
+            "question": RunnablePassthrough(),
+        }
+        | rag_prompt
         | model
         | StrOutputParser()
     )
     return chain
+
 
 
 # --- 実行部分 ---
