@@ -4,12 +4,13 @@ load_dotenv()
 import pprint
 
 from langchain_community.document_loaders import GitLoader
-from langchain_chroma import Chroma
+from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
-
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 
 # --- Step 1: .md ファイルをGitHubから読み込む ---
 def file_filter(file_path: str) -> bool:
@@ -23,7 +24,7 @@ def load_documents():
         clone_url="https://github.com/langchain-ai/langchain",
         repo_path="./langchain",
         branch="master",
-        file_filter_fn=file_filter,
+        file_filter=file_filter,
     )
     documents = loader.load()
     print(f"読み込んだドキュメント数: {len(documents)}")
@@ -33,8 +34,31 @@ def load_documents():
 # --- Step 2: OpenAIのEmbeddingモデルでベクトル化 & Chromaへ格納 ---
 def build_vectorstore(documents):
     print("OpenAI Embeddings でベクトル化中...")
+
+    # 1) まず文書をチャンク分割（サイズとオーバーラップは用途に応じて調整）
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,      # ≒ 1000 文字ベース（トークンで厳密にやるなら TokenTextSplitter を使用）
+        chunk_overlap=200,
+        length_function=len,  # まずはシンプルに。厳密にトークン管理したければ tiktoken を使う
+        add_start_index=True,
+    )
+    split_docs = splitter.split_documents(documents)
+    print(f"分割後のチャンク数: {len(split_docs)}")
+
+    # 2) 埋め込み器を用意
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-    db = Chroma.from_documents(documents, embeddings)
+
+    # 3) 空の Chroma を作ってから「小分けで」追加
+    db = Chroma(embedding_function=embeddings)
+
+    # バッチを小さく保つ（合計トークンが30万を超えない目安として、まずは100〜200件ずつ）
+    batch_size = 100
+    for i in range(0, len(split_docs), batch_size):
+        batch = split_docs[i:i + batch_size]
+        db.add_documents(batch)
+        if (i // batch_size) % 10 == 0:
+            print(f"  進捗: {i + len(batch)}/{len(split_docs)} チャンクを追加")
+
     print("Chromaベクトルストアを作成しました。")
     return db
 
